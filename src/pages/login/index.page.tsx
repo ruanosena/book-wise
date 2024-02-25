@@ -10,6 +10,10 @@ import {
 	Options,
 	Button,
 } from "./styles";
+import { signIn } from "next-auth/react";
+import { GetServerSideProps } from "next";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../api/auth/[...nextauth].api";
 
 export default function Login() {
 	return (
@@ -27,10 +31,10 @@ export default function Login() {
 					<SubTitle>Faça seu login ou acesse como visitante.</SubTitle>
 				</div>
 				<Options>
-					<Button>
+					<Button onClick={() => signIn("google")}>
 						<GoogleLogo size={32} /> Google
 					</Button>
-					<Button>
+					<Button onClick={() => signIn("github")}>
 						<GithubLogo size={32} /> GitHub
 					</Button>
 					<Button>
@@ -42,3 +46,20 @@ export default function Login() {
 		</Container>
 	);
 }
+
+export const getServerSideProps: GetServerSideProps = async ({ req, res }) => {
+	const session = await getServerSession(req, res, authOptions);
+
+	if (session?.user) {
+		return {
+			redirect: {
+				destination: "/",
+				permanent: false,
+			},
+		};
+	}
+
+	return {
+		props: {},
+	};
+};
