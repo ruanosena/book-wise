@@ -1,13 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StarIcon } from "./styles";
 
-export function StarRating() {
+interface StarRatingProps {
+	staticStatus?: boolean;
+	stars?: number;
+	onChangeStars?: (value: number) => void;
+}
+
+export function StarRating({ staticStatus = false, stars, onChangeStars }: StarRatingProps) {
 	const [rating, setRating] = useState<number>(0);
 	const [hover, setHover] = useState<number>(0);
 
 	function handleChangeRating(value: number) {
-		setRating(value);
+		if (!staticStatus) {
+			setRating(value);
+			onChangeStars && onChangeStars(value);
+		}
 	}
+	useEffect(() => {
+		if (typeof stars == "number") {
+			setRating(stars);
+		}
+	}, [stars]);
 
 	return (
 		<div>
@@ -27,8 +41,8 @@ export function StarRating() {
 						<StarIcon
 							size={14}
 							weight={isFilled ? "fill" : "regular"}
-							onMouseEnter={() => setHover(ratingValue)}
-							onMouseLeave={() => setHover(0)}
+							onMouseEnter={() => !staticStatus && setHover(ratingValue)}
+							onMouseLeave={() => !staticStatus && setHover(0)}
 						/>
 					</label>
 				);

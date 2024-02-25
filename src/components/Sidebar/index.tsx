@@ -21,7 +21,7 @@ export function Sidebar() {
 					<ChartLineUp size={24} />
 					Início
 				</NavItem>
-				<NavItem href="/explorar" active={activePathname === "/explorar" ? "true" : "false"}>
+				<NavItem href="/explore" active={activePathname === "/explore" ? "true" : "false"}>
 					<Binoculars size={24} />
 					Explorar
 				</NavItem>
