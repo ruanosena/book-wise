@@ -53,7 +53,7 @@ export function Sidebar() {
 				</ButtonFooterLink>
 			) : (
 				<ButtonFooterLink variant="logout" onClick={handleLogout} href="/">
-					{session.data.user.image && <Avatar src={session.data.user.image} alt="" />}
+					{<Avatar src={session.data.user.avatar_url} alt="" />}
 					{session.data.user.name}
 					<SignOut size={20} />
 				</ButtonFooterLink>

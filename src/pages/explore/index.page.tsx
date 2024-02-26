@@ -50,10 +50,12 @@ import {
 	Check,
 } from "@phosphor-icons/react/dist/ssr";
 import { Tag } from "@/components/Tag";
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { StarRating } from "@/components/StarRating";
 import { GetServerSideProps } from "next";
 import { prisma } from "@/lib/prisma";
+import { useSession } from "next-auth/react";
+import { api } from "@/lib/axios";
 
 interface Book {
 	id: string;
@@ -63,6 +65,22 @@ interface Book {
 		book_id: string;
 		categoryId: string;
 	}[];
+	ratings: ({
+		user: {
+			id: string;
+			name: string;
+			email: string;
+			avatar_url: string | null;
+			created_at: string;
+		};
+	} & {
+		id: string;
+		rate: number;
+		description: string;
+		created_at: string;
+		book_id: string;
+		user_id: string;
+	})[];
 	summary: string;
 	cover_url: string;
 	total_pages: number;
@@ -80,12 +98,15 @@ interface ExploreProps {
 }
 
 export default function Explore({ books, categories }: ExploreProps) {
-	const [selectedBook, setSelectedBook] = useState<string | null>(null);
+	const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+	const [searchInput, setSearchInput] = useState("");
 	const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 	const [isModalOpen, setIsModalOpen] = useState(false);
 	const [isFormShown, setIsFormShown] = useState(false);
 	const [shownBooks, setShownBooks] = useState<Book[]>(books);
 	const [selectedCategories, setSelectedCategories] = useState<Category[]>(categories);
+
+	const session = useSession();
 
 	function handleToggleDrawer() {
 		setIsDrawerOpen((state) => !state);
@@ -119,12 +140,40 @@ export default function Explore({ books, categories }: ExploreProps) {
 	}, [selectedCategories, books]);
 
 	function handleToggleCommentForm() {
-		handleToggleModal();
-		setIsFormShown((state) => !state);
+		if (!session.data?.user) {
+			handleToggleModal();
+		} else {
+			setIsFormShown((state) => !state);
+		}
 	}
 
-	function handleSelectBook(bookId: string) {
-		setSelectedBook(bookId);
+	function handleSelectBook(book: Book) {
+		setSelectedBook(book);
+	}
+
+	async function handleSearch(event: FormEvent) {
+		event.preventDefault();
+		if (searchInput.trim()) {
+			const response = await api.get<{ books: Book[] }>("/search", {
+				params: { q: searchInput.trim() },
+			});
+
+			setShownBooks(
+				response.data.books.filter((book) =>
+					book.categories.some((category) =>
+						selectedCategories.some((selected) => selected.id === category.categoryId)
+					)
+				)
+			);
+		} else {
+			setShownBooks(
+				books.filter((book) =>
+					book.categories.some((category) =>
+						selectedCategories.some((selected) => selected.id === category.categoryId)
+					)
+				)
+			);
+		}
 	}
 
 	useEffect(() => {
@@ -143,9 +192,13 @@ export default function Explore({ books, categories }: ExploreProps) {
 							<Binoculars size={32} />
 							Explorar
 						</PageTitle>
-						<SearchForm>
-							<Input placeholder="Buscar livro ou autor" />
-							<SearchButton type="button">
+						<SearchForm onSubmit={handleSearch}>
+							<Input
+								placeholder="Buscar livro ou autor"
+								value={searchInput}
+								onChange={(e) => setSearchInput(e.target.value)}
+							/>
+							<SearchButton type="button" onClick={handleSearch}>
 								<MagnifyingGlass size={20} />
 							</SearchButton>
 						</SearchForm>
@@ -165,7 +218,7 @@ export default function Explore({ books, categories }: ExploreProps) {
 
 					<Books>
 						{shownBooks.map((book) => (
-							<BookCard key={book.id} onClick={() => handleSelectBook(book.id)}>
+							<BookCard key={book.id} onClick={() => handleSelectBook(book)}>
 								<BookCardContent>
 									<BookImage src={book.cover_url} />
 									<BookDetails>
@@ -173,7 +226,12 @@ export default function Explore({ books, categories }: ExploreProps) {
 											<BookTitle>{book.name}</BookTitle>
 											<BookAuthor>{book.author}</BookAuthor>
 										</div>
-										<StarRating />
+										<StarRating
+											stars={Math.round(
+												book.ratings.reduce((sum, rating) => (sum += rating.rate), 0) /
+													book.ratings.length
+											)}
+										/>
 									</BookDetails>
 								</BookCardContent>
 							</BookCard>
@@ -186,132 +244,112 @@ export default function Explore({ books, categories }: ExploreProps) {
 						<X size={24} />
 					</DrawerClose>
 
-					<DrawerContent>
-						<BookCard>
-							<BookCardContent>
-								<BookImage src="/images/books/o-fim-da-eternidade.png" />
-								<BookDetails>
-									<div>
-										<BookTitle>O Fim da eternidade</BookTitle>
-										<BookAuthor>Isaac Asimov</BookAuthor>
-									</div>
-									<div>
+					{selectedBook && (
+						<DrawerContent>
+							<BookCard>
+								<BookCardContent>
+									<BookImage src={selectedBook.cover_url} />
+									<BookDetails>
+										<div>
+											<BookTitle>{selectedBook.name}</BookTitle>
+											<BookAuthor>{selectedBook.author}</BookAuthor>
+										</div>
+										<div>
+											<StarRating
+												stars={Math.round(
+													selectedBook.ratings.reduce((sum, rating) => (sum += rating.rate), 0) /
+														selectedBook.ratings.length
+												)}
+											/>
+											<span>
+												{selectedBook.ratings.length === 1
+													? "1 avaliação"
+													: `${selectedBook.ratings.length} avaliações`}
+											</span>
+										</div>
+									</BookDetails>
+								</BookCardContent>
+								<BookCardInfo>
+									<BookAbout>
+										<BookmarkSimple size={24} />
+										<div>
+											<span>Categoria</span>
+											{selectedBook.categories
+												.map(
+													({ categoryId }) =>
+														categories.find((category) => category.id === categoryId)?.name
+												)
+												.join(", ")}
+										</div>
+									</BookAbout>
+									<BookAbout>
+										<BookOpen size={24} />
+										<div>
+											<span>Páginas</span>
+											{selectedBook.total_pages}
+										</div>
+									</BookAbout>
+								</BookCardInfo>
+							</BookCard>
+							<AvaliationsHeading>
+								<span>Avaliações</span>
+								{!isFormShown && (
+									<AvaliationsButton onClick={handleToggleCommentForm}>Avaliar</AvaliationsButton>
+								)}
+							</AvaliationsHeading>
+							{session.data && isFormShown && (
+								<CommentFormContainer>
+									<AvaliationHeader>
+										<AvaliationUser>
+											<AvaliationAvatar src={session.data.user.avatar_url} alt="avatar" />
+											<div>{session.data.user.name}</div>
+										</AvaliationUser>
 										<StarRating />
-										<span>3 avaliações</span>
-									</div>
-								</BookDetails>
-							</BookCardContent>
-							<BookCardInfo>
-								<BookAbout>
-									<BookmarkSimple size={24} />
-									<div>
-										<span>Categoria</span>
-										Computação, educação
-									</div>
-								</BookAbout>
-								<BookAbout>
-									<BookOpen size={24} />
-									<div>
-										<span>Páginas</span>
-										160
-									</div>
-								</BookAbout>
-							</BookCardInfo>
-						</BookCard>
-						<AvaliationsHeading>
-							<span>Avaliações</span>
-							{!isFormShown && (
-								<AvaliationsButton onClick={handleToggleCommentForm}>Avaliar</AvaliationsButton>
+									</AvaliationHeader>
+									<CommentFormInput placeholder="Escreva sua avaliação" />
+									<CommentFormActions>
+										<CommentFormButton>
+											<X size={24} onClick={handleToggleCommentForm} />
+										</CommentFormButton>
+										<CommentFormButton>
+											<Check size={24} />
+										</CommentFormButton>
+									</CommentFormActions>
+								</CommentFormContainer>
 							)}
-						</AvaliationsHeading>
-						{isFormShown && (
-							<CommentFormContainer>
-								<AvaliationHeader>
-									<AvaliationUser>
-										<AvaliationAvatar src="https://github.com/ruanosena.png" alt="avatar" />
-										<div>Cristofer Rosser</div>
-									</AvaliationUser>
-									<StarRating />
-								</AvaliationHeader>
-								<CommentFormInput placeholder="Escreva sua avaliação" />
-								<CommentFormActions>
-									<CommentFormButton>
-										<X size={24} />
-									</CommentFormButton>
-									<CommentFormButton>
-										<Check size={24} />
-									</CommentFormButton>
-								</CommentFormActions>
-							</CommentFormContainer>
-						)}
-						<Avaliation avaliationOf="mine">
-							<AvaliationHeader>
-								<AvaliationUser>
-									<AvaliationAvatar src="https://github.com/ruanosena.png" alt="avatar" />
-									<div>
-										Cristofer Rosser
-										<span>Hoje</span>
-									</div>
-								</AvaliationUser>
-								<StarRating staticStatus stars={5} />
-							</AvaliationHeader>
-							<AvaliationComment>
-								Tortor sed elementum dolor sed nunc elementum enim viverra. Massa tempus ac a
-								adipiscing at cursus senectus dui libero. Elementum lacus enim viverra arcu at ut
-								amet convallis. Maecenas ac fringilla blandit risus nibh praesent sagittis dapibus
-								netus. Dignissim sed congue sed vel faucibus purus dapibus pellentesque.
-							</AvaliationComment>
-						</Avaliation>
-						<Avaliation>
-							<AvaliationHeader>
-								<AvaliationUser>
-									<AvaliationAvatar src="https://github.com/ruanosena.png" alt="avatar" />
-									<div>
-										Brandon Botosh
-										<span>Há 2 dias</span>
-									</div>
-								</AvaliationUser>
-								<StarRating staticStatus stars={4} />
-							</AvaliationHeader>
-							<AvaliationComment>
-								Nec tempor nunc in egestas. Euismod nisi eleifend at et in sagittis. Penatibus id
-								vestibulum imperdiet a at imperdiet lectus leo. Sit porta eget nec vitae sit
-								vulputate eget
-							</AvaliationComment>
-						</Avaliation>
-
-						<Avaliation>
-							<AvaliationHeader>
-								<AvaliationUser>
-									<AvaliationAvatar src="https://github.com/ruanosena.png" alt="avatar" />
-									<div>
-										Jaylon Franci
-										<span>Há 4 meses</span>
-									</div>
-								</AvaliationUser>
-								<StarRating staticStatus stars={4} />
-							</AvaliationHeader>
-							<AvaliationComment>Nec tempor nunc in egestas.</AvaliationComment>
-						</Avaliation>
-
-						<Avaliation>
-							<AvaliationHeader>
-								<AvaliationUser>
-									<AvaliationAvatar src="https://github.com/ruanosena.png" alt="avatar" />
-									<div>
-										James Botosh
-										<span>Há 4 meses</span>
-									</div>
-								</AvaliationUser>
-								<StarRating staticStatus stars={4} />
-							</AvaliationHeader>
-							<AvaliationComment>
-								Nec tempor nunc in egestas. Euismod nisi eleifend at et in sagittis. Penatibus id
-								vestibulum imperdiet a at imperdiet lectus leo. Sit porta eget nec vitae sit
-								vulputate eget
-							</AvaliationComment>
-						</Avaliation>
-					</DrawerContent>
+							{selectedBook.ratings.map((rate) => {
+								return rate.user.id === session.data?.user.id ? (
+									<Avaliation avaliationOf="mine">
+										<AvaliationHeader>
+											<AvaliationUser>
+												<AvaliationAvatar src={rate.user.avatar_url!} alt="avatar" />
+												<div>
+													{rate.user.name}
+													<span>{new Date(rate.created_at).toLocaleDateString()}</span>
+												</div>
+											</AvaliationUser>
+											<StarRating staticStatus stars={rate.rate} />
+										</AvaliationHeader>
+										<AvaliationComment>{rate.description}</AvaliationComment>
+									</Avaliation>
+								) : (
+									<Avaliation key={rate.id}>
+										<AvaliationHeader>
+											<AvaliationUser>
+												<AvaliationAvatar src={rate.user.avatar_url!} alt="avatar" />
+												<div>
+													{rate.user.name}
+													<span>{new Date(rate.created_at).toLocaleDateString()}</span>
+												</div>
+											</AvaliationUser>
+											<StarRating staticStatus stars={rate.rate} />
+										</AvaliationHeader>
+										<AvaliationComment>{rate.description}</AvaliationComment>
+									</Avaliation>
+								);
+							})}
+						</DrawerContent>
+					)}
 				</Drawer>
 				{isDrawerOpen && <DrawerOverlay onClick={handleToggleDrawer} />}
 				<Modal state={isModalOpen ? "open" : "closed"}>
@@ -333,13 +371,21 @@ export default function Explore({ books, categories }: ExploreProps) {
 
 export const getServerSideProps: GetServerSideProps = async ({ req, res }) => {
 	const books = await prisma.book.findMany({
-		include: { categories: true },
+		include: { categories: true, ratings: { include: { user: true } } },
 	});
 	const categories = await prisma.category.findMany();
 
 	return {
 		props: {
-			books: books.map((book) => ({ ...book, created_at: book.created_at.toISOString() })),
+			books: books.map((book) => ({
+				...book,
+				created_at: book.created_at.toISOString(),
+				ratings: book.ratings.map((rating) => ({
+					...rating,
+					created_at: rating.created_at.toISOString(),
+					user: { ...rating.user, created_at: rating.user.created_at.toISOString() },
+				})),
+			})),
 			categories,
 		},
 	};

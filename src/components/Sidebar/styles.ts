@@ -98,6 +98,8 @@ export const ButtonFooterLink = styled(Link, {
 });
 
 export const Avatar = styled("img", {
+	width: 32,
+	height: 32,
 	borderRadius: "$full",
 	border: "1px solid $green100",
 });
