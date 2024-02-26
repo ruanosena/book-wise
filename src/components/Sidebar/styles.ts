@@ -81,7 +81,23 @@ export const ButtonFooterLink = styled(Link, {
 	gap: "$3",
 	color: "$gray200",
 
-	svg: {
-		color: "$green100",
+	variants: {
+		variant: {
+			logout: {
+				svg: {
+					color: "#f75a68",
+				},
+			},
+			login: {
+				svg: {
+					color: "$green100",
+				},
+			},
+		},
 	},
+});
+
+export const Avatar = styled("img", {
+	borderRadius: "$full",
+	border: "1px solid $green100",
 });

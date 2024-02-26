@@ -77,6 +77,7 @@ export const SearchButton = styled("button", {
 
 export const Categories = styled("div", {
 	display: "flex",
+	flexFlow: "row wrap",
 	gap: "$3",
 	margin: "$10 0 3rem",
 });

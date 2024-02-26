@@ -1,11 +1,24 @@
-import { Binoculars, Book, ChartLineUp, SignIn, User } from "@phosphor-icons/react/dist/ssr";
-import { Container, ButtonFooterLink, Logo, Nav, NavItem } from "./styles";
+import {
+	Binoculars,
+	Book,
+	ChartLineUp,
+	SignIn,
+	SignOut,
+	User,
+} from "@phosphor-icons/react/dist/ssr";
+import { Container, ButtonFooterLink, Logo, Nav, NavItem, Avatar } from "./styles";
 import { useRouter } from "next/router";
+import { signOut, useSession } from "next-auth/react";
 
 export function Sidebar() {
 	const router = useRouter();
+	const session = useSession();
 
 	const activePathname = router.pathname;
+
+	function handleLogout() {
+		signOut();
+	}
 
 	return (
 		<Container>
@@ -26,15 +39,25 @@ export function Sidebar() {
 					Explorar
 				</NavItem>
 
-				<NavItem href="/profile" active={activePathname === "/profile" ? "true" : "false"}>
-					<User size={24} />
-					Perfil
-				</NavItem>
+				{session.data?.user && (
+					<NavItem href="/profile" active={activePathname === "/profile" ? "true" : "false"}>
+						<User size={24} />
+						Perfil
+					</NavItem>
+				)}
 			</Nav>
-			<ButtonFooterLink href="/login">
-				Fazer login
-				<SignIn size={24} />
-			</ButtonFooterLink>
+			{!session.data?.user ? (
+				<ButtonFooterLink variant="login" href="/login">
+					Fazer login
+					<SignIn size={20} />
+				</ButtonFooterLink>
+			) : (
+				<ButtonFooterLink variant="logout" onClick={handleLogout} href="/">
+					{session.data.user.image && <Avatar src={session.data.user.image} alt="" />}
+					{session.data.user.name}
+					<SignOut size={20} />
+				</ButtonFooterLink>
+			)}
 		</Container>
 	);
 }

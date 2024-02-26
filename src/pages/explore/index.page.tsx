@@ -52,24 +52,40 @@ import {
 import { Tag } from "@/components/Tag";
 import { useEffect, useState } from "react";
 import { StarRating } from "@/components/StarRating";
+import { GetServerSideProps } from "next";
+import { prisma } from "@/lib/prisma";
 
-const CategoriesTags = [
-	"Tudo",
-	"Computação",
-	"Educação",
-	"Fantasia",
-	"Ficção científica",
-	"Horror",
-	"HQs",
-	"Suspense",
-];
+interface Book {
+	id: string;
+	name: string;
+	author: string;
+	categories: {
+		book_id: string;
+		categoryId: string;
+	}[];
+	summary: string;
+	cover_url: string;
+	total_pages: number;
+	created_at: string;
+}
 
-export default function Explore() {
-	const [selectedBook, setSelectedBook] = useState<number | null>(null);
+interface Category {
+	id: string;
+	name: string;
+}
+
+interface ExploreProps {
+	books: Book[];
+	categories: Category[];
+}
+
+export default function Explore({ books, categories }: ExploreProps) {
+	const [selectedBook, setSelectedBook] = useState<string | null>(null);
 	const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 	const [isModalOpen, setIsModalOpen] = useState(false);
 	const [isFormShown, setIsFormShown] = useState(false);
-	const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+	const [shownBooks, setShownBooks] = useState<Book[]>(books);
+	const [selectedCategories, setSelectedCategories] = useState<Category[]>(categories);
 
 	function handleToggleDrawer() {
 		setIsDrawerOpen((state) => !state);
@@ -79,31 +95,35 @@ export default function Explore() {
 		setIsModalOpen((state) => !state);
 	}
 
-	function handleSelectCategory(tag: string) {
+	function handleSelectCategory(category: Category) {
 		setSelectedCategories((state) => {
-			if (tag === "Tudo") {
-				return ["Tudo"];
-			} else if (state.includes("Tudo")) {
-				state = state.filter((category) => category !== "Tudo");
-			}
-
-			if (state.includes(tag) && state.length === 1) {
+			if (state.length === 1 && state[0].id === category.id) {
 				return state;
 			}
-			const categories = state.includes(tag)
-				? state.filter((category) => category !== tag)
-				: [...state, tag];
+			const categories = state.some(({ id }) => id === category.id)
+				? state.filter(({ id }) => id !== category.id)
+				: [...state, category];
 
 			return categories;
 		});
 	}
+
+	useEffect(() => {
+		setShownBooks(() =>
+			books.filter((book) =>
+				book.categories.some((category) =>
+					selectedCategories.some((selected) => selected.id === category.categoryId)
+				)
+			)
+		);
+	}, [selectedCategories, books]);
 
 	function handleToggleCommentForm() {
 		handleToggleModal();
 		setIsFormShown((state) => !state);
 	}
 
-	function handleSelectBook(bookId: number) {
+	function handleSelectBook(bookId: string) {
 		setSelectedBook(bookId);
 	}
 
@@ -132,132 +152,32 @@ export default function Explore() {
 					</Heading>
 
 					<Categories>
-						{CategoriesTags.map((tag) => (
+						{categories.map((category) => (
 							<Tag
-								key={tag}
-								onSelect={() => handleSelectCategory(tag)}
-								isSelected={selectedCategories.includes(tag)}
+								key={category.id}
+								onSelect={() => handleSelectCategory(category)}
+								isSelected={selectedCategories.some(({ id }) => id === category.id)}
 							>
-								{tag}
+								{category.name}
 							</Tag>
 						))}
 					</Categories>
 
 					<Books>
-						<BookCard onClick={() => handleSelectBook(9)}>
-							<BookCardContent>
-								<BookImage src="/images/books/fragmentos-do-horror.png" />
-								<BookDetails>
-									<div>
-										<BookTitle>Fragmentos do Horror</BookTitle>
-										<BookAuthor>Junji Ito</BookAuthor>
-									</div>
-									<StarRating />
-								</BookDetails>
-							</BookCardContent>
-						</BookCard>
-
-						<BookCard onClick={() => handleSelectBook(8)}>
-							<BookCardContent>
-								<BookImage src="/images/books/14-habitos-de-desenvolvedores-altamente-produtivos.png" />
-								<BookDetails>
-									<div>
-										<BookTitle>14 Habitos de Desenvolvedores Altamente Produtivos</BookTitle>
-										<BookAuthor>Zeno Rocha</BookAuthor>
-									</div>
-									<StarRating />
-								</BookDetails>
-							</BookCardContent>
-						</BookCard>
-
-						<BookCard onClick={() => handleSelectBook(7)}>
-							<BookCardContent>
-								<BookImage src="/images/books/o-fim-da-eternidade.png" />
-								<BookDetails>
-									<div>
-										<BookTitle>O Fim da eternidade</BookTitle>
-										<BookAuthor>Isaac Asimov</BookAuthor>
-									</div>
-									<StarRating />
-								</BookDetails>
-							</BookCardContent>
-						</BookCard>
-						<BookCard onClick={() => handleSelectBook(6)}>
-							<BookCardContent>
-								<BookImage src="/images/books/fragmentos-do-horror.png" />
-								<BookDetails>
-									<div>
-										<BookTitle>Fragmentos do Horror</BookTitle>
-										<BookAuthor>Junji Ito</BookAuthor>
-									</div>
-									<StarRating />
-								</BookDetails>
-							</BookCardContent>
-						</BookCard>
-
-						<BookCard onClick={() => handleSelectBook(5)}>
-							<BookCardContent>
-								<BookImage src="/images/books/14-habitos-de-desenvolvedores-altamente-produtivos.png" />
-								<BookDetails>
-									<div>
-										<BookTitle>14 Habitos de Desenvolvedores Altamente Produtivos</BookTitle>
-										<BookAuthor>Zeno Rocha</BookAuthor>
-									</div>
-									<StarRating />
-								</BookDetails>
-							</BookCardContent>
-						</BookCard>
-
-						<BookCard onClick={() => handleSelectBook(4)}>
-							<BookCardContent>
-								<BookImage src="/images/books/o-fim-da-eternidade.png" />
-								<BookDetails>
-									<div>
-										<BookTitle>O Fim da eternidade</BookTitle>
-										<BookAuthor>Isaac Asimov</BookAuthor>
-									</div>
-									<StarRating />
-								</BookDetails>
-							</BookCardContent>
-						</BookCard>
-						<BookCard onClick={() => handleSelectBook(3)}>
-							<BookCardContent>
-								<BookImage src="/images/books/fragmentos-do-horror.png" />
-								<BookDetails>
-									<div>
-										<BookTitle>Fragmentos do Horror</BookTitle>
-										<BookAuthor>Junji Ito</BookAuthor>
-									</div>
-									<StarRating />
-								</BookDetails>
-							</BookCardContent>
-						</BookCard>
-
-						<BookCard onClick={() => handleSelectBook(2)}>
-							<BookCardContent>
-								<BookImage src="/images/books/14-habitos-de-desenvolvedores-altamente-produtivos.png" />
-								<BookDetails>
-									<div>
-										<BookTitle>14 Habitos de Desenvolvedores Altamente Produtivos</BookTitle>
-										<BookAuthor>Zeno Rocha</BookAuthor>
-									</div>
-									<StarRating />
-								</BookDetails>
-							</BookCardContent>
-						</BookCard>
-
-						<BookCard onClick={() => handleSelectBook(1)}>
-							<BookCardContent>
-								<BookImage src="/images/books/o-fim-da-eternidade.png" />
-								<BookDetails>
-									<div>
-										<BookTitle>O Fim da eternidade</BookTitle>
-										<BookAuthor>Isaac Asimov</BookAuthor>
-									</div>
-									<StarRating />
-								</BookDetails>
-							</BookCardContent>
-						</BookCard>
+						{shownBooks.map((book) => (
+							<BookCard key={book.id} onClick={() => handleSelectBook(book.id)}>
+								<BookCardContent>
+									<BookImage src={book.cover_url} />
+									<BookDetails>
+										<div>
+											<BookTitle>{book.name}</BookTitle>
+											<BookAuthor>{book.author}</BookAuthor>
+										</div>
+										<StarRating />
+									</BookDetails>
+								</BookCardContent>
+							</BookCard>
+						))}
 					</Books>
 				</Content>
 
@@ -410,3 +330,17 @@ export default function Explore() {
 		</Container>
 	);
 }
+
+export const getServerSideProps: GetServerSideProps = async ({ req, res }) => {
+	const books = await prisma.book.findMany({
+		include: { categories: true },
+	});
+	const categories = await prisma.category.findMany();
+
+	return {
+		props: {
+			books: books.map((book) => ({ ...book, created_at: book.created_at.toISOString() })),
+			categories,
+		},
+	};
+};
